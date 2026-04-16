@@ -2,7 +2,7 @@ import telebot
 from telebot import types
 import sqlite3
 
-# 🔥 ANTI-SLEEP IMPORTS
+# 🔥 ANTI-SLEEP
 from flask import Flask
 import threading
 
@@ -42,14 +42,7 @@ conn.commit()
 accounts = []
 
 # =========================
-# 🧠 STATES
-# =========================
-admin_add = {}
-admin_delete = {}
-admin_edit = {}
-
-# =========================
-# 🔥 ANTI-SLEEP (FLASK SERVER)
+# 🔥 ANTI-SLEEP SERVER
 # =========================
 app = Flask(__name__)
 
@@ -57,12 +50,10 @@ app = Flask(__name__)
 def home():
     return "bot is alive"
 
-
-def run_flask():
+def run():
     app.run(host="0.0.0.0", port=10000)
 
-
-threading.Thread(target=run_flask).start()
+threading.Thread(target=run).start()
 
 # =========================
 # HELPERS
@@ -80,7 +71,6 @@ def get_user(user_id):
         return {"balance": 0, "invited_by": None}
 
     return {"balance": row[1], "invited_by": row[2]}
-
 
 def update_balance(user_id, amount):
     cur.execute("UPDATE users SET balance = balance + ? WHERE user_id=?", (amount, user_id))
@@ -100,7 +90,15 @@ def start(msg):
     kb.add("🆘 Поддержка", "👥 Реферал")
     kb.add("👤 Профиль")
 
-    bot.send_message(user_id, "✨ Добро пожаловать", reply_markup=kb)
+    bot.send_message(
+        user_id,
+        "✨ Добро пожаловать!\n\n"
+        "🛍 Каталог доступен\n"
+        "⚡ Быстрая выдача\n"
+        "💰 Баланс и рефералы\n\n"
+        "👇 Выбери действие",
+        reply_markup=kb
+    )
 
 # =========================
 # 📦 КАТАЛОГ
@@ -114,12 +112,17 @@ def show_catalog(chat_id):
     text = "📦 <b>Каталог:</b>\n\n"
 
     for i, acc in enumerate(accounts):
-        text += f"{i+1}. {acc['item']}\n📝 {acc['desc']}\n💰 {acc['price']}₽\n\n"
+        text += f"{i+1}. {acc['item']} | 💰 {acc['price']}₽\n"
 
     kb = types.InlineKeyboardMarkup()
 
     for i in range(len(accounts)):
-        kb.add(types.InlineKeyboardButton(f"Купить #{i+1}", callback_data=f"buy_{i}"))
+        kb.add(
+            types.InlineKeyboardButton(
+                text=f"Купить #{i+1}",
+                callback_data=f"buy_{i}"
+            )
+        )
 
     bot.send_message(chat_id, text, parse_mode="HTML", reply_markup=kb)
 
@@ -146,151 +149,38 @@ def text(msg):
         )
 
     elif msg.text == "👥 Реферал":
-        bot.send_message(user_id, "👥 Реферал работает")
+        bot.send_message(user_id, "👥 Реферальная система работает")
 
     elif msg.text == "🆘 Поддержка":
         bot.send_message(user_id, "💬 Поддержка")
 
-    elif msg.text == "/admin":
-
-        if user_id not in ADMINS:
-            bot.send_message(user_id, "❌ Нет доступа")
-            return
-
-        kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        kb.row("➕ Добавить", "➖ Удалить")
-        kb.row("✏️ Редактировать", "📦 Склад")
-        kb.row("🔙 Выход")
-
-        bot.send_message(user_id, "👮 Админ панель", reply_markup=kb)
-
-    elif msg.text == "➕ Добавить" and user_id in ADMINS:
-        admin_add[user_id] = {"step": 1}
-        bot.send_message(user_id, "Введи название товара")
-
-    elif user_id in admin_add:
-
-        state = admin_add[user_id]
-
-        if state["step"] == 1:
-            state["item"] = msg.text
-            state["step"] = 2
-            bot.send_message(user_id, "Введи описание товара")
-            return
-
-        if state["step"] == 2:
-            state["desc"] = msg.text
-            state["step"] = 3
-            bot.send_message(user_id, "Введи цену")
-            return
-
-        if state["step"] == 3:
-
-            if not msg.text.isdigit():
-                bot.send_message(user_id, "❌ Введи число")
-                return
-
-            accounts.append({
-                "item": state["item"],
-                "desc": state["desc"],
-                "price": int(msg.text)
-            })
-
-            admin_add.pop(user_id)
-            bot.send_message(user_id, "✅ Добавлено")
-
-    elif msg.text == "➖ Удалить" and user_id in ADMINS:
-        admin_delete[user_id] = True
-        bot.send_message(user_id, "Введи номер товара")
-
-    elif user_id in admin_delete:
-
-        try:
-            index = int(msg.text) - 1
-            accounts.pop(index)
-            admin_delete.pop(user_id)
-            bot.send_message(user_id, "🗑 Удалено")
-        except:
-            bot.send_message(user_id, "❌ Ошибка")
-
-    elif msg.text == "✏️ Редактировать" and user_id in ADMINS:
-        admin_edit[user_id] = {"step": 1}
-        bot.send_message(user_id, "Введи номер товара")
-
-    elif user_id in admin_edit:
-
-        state = admin_edit[user_id]
-
-        if state["step"] == 1:
-
-            index = int(msg.text) - 1
-
-            if index < 0 or index >= len(accounts):
-                bot.send_message(user_id, "❌ Нет товара")
-                admin_edit.pop(user_id)
-                return
-
-            state["index"] = index
-            state["step"] = 2
-            bot.send_message(user_id, "Введи новое название")
-            return
-
-        if state["step"] == 2:
-            state["item"] = msg.text
-            state["step"] = 3
-            bot.send_message(user_id, "Введи новое описание")
-            return
-
-        if state["step"] == 3:
-            state["desc"] = msg.text
-            state["step"] = 4
-            bot.send_message(user_id, "Введи новую цену")
-            return
-
-        if state["step"] == 4:
-
-            if not msg.text.isdigit():
-                bot.send_message(user_id, "❌ Введи число")
-                return
-
-            accounts[state["index"]] = {
-                "item": state["item"],
-                "desc": state["desc"],
-                "price": int(msg.text)
-            }
-
-            admin_edit.pop(user_id)
-            bot.send_message(user_id, "✅ Обновлено")
-
-    elif msg.text == "📦 Склад" and user_id in ADMINS:
-
-        text = "📦 Склад:\n\n"
-        for i, a in enumerate(accounts):
-            text += f"{i+1}. {a['item']} | {a['price']}₽\n"
-
-        bot.send_message(user_id, text)
-
-    elif msg.text == "🔙 Выход":
-        kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        kb.add("📦 Каталог", "👤 Профиль")
-        bot.send_message(user_id, "Главное меню", reply_markup=kb)
-
-    else:
-        bot.send_message(user_id, "Используй кнопки 👇")
-
 # =========================
 # CALLBACKS
 # =========================
-@bot.callback_query_handler(func=lambda call: call.data.startswith("buy_"))
-def buy(call):
+@bot.callback_query_handler(func=lambda call: True)
+def callbacks(call):
 
     user_id = call.from_user.id
-    index = int(call.data.split("_")[1])
+    data = call.data
 
-    item = accounts[index]
+    if data.startswith("buy_"):
 
-    bot.answer_callback_query(call.id, "Куплено")
-    bot.send_message(user_id, f"🎁 {item['item']}\n📝 {item['desc']}\n💰 {item['price']}₽")
+        index = int(data.split("_")[1])
+
+        if index >= len(accounts):
+            bot.answer_callback_query(call.id, "❌ Ошибка")
+            return
+
+        item = accounts.pop(index)
+
+        bot.answer_callback_query(call.id, "✅ Куплено")
+        bot.send_message(user_id, f"🎁 {item['item']}")
+
+    elif data == "topup":
+        bot.send_message(user_id, "💰 Пополнение скоро")
+
+    elif data == "mybuy":
+        bot.send_message(user_id, "📦 История покупок")
 
 print("bot running...")
 bot.infinity_polling()
