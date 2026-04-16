@@ -2,6 +2,10 @@ import telebot
 from telebot import types
 import sqlite3
 
+# 🔥 ANTI-SLEEP IMPORTS
+from flask import Flask
+import threading
+
 token = "8581481992:AAFg_5N4KnUyWwp-p4KX9fiR5AoUtPabcHY"
 bot = telebot.TeleBot(token)
 
@@ -43,6 +47,22 @@ accounts = []
 admin_add = {}
 admin_delete = {}
 admin_edit = {}
+
+# =========================
+# 🔥 ANTI-SLEEP (FLASK SERVER)
+# =========================
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "bot is alive"
+
+
+def run_flask():
+    app.run(host="0.0.0.0", port=10000)
+
+
+threading.Thread(target=run_flask).start()
 
 # =========================
 # HELPERS
@@ -259,7 +279,7 @@ def text(msg):
         bot.send_message(user_id, "Используй кнопки 👇")
 
 # =========================
-# CALLBACK
+# CALLBACKS
 # =========================
 @bot.callback_query_handler(func=lambda call: call.data.startswith("buy_"))
 def buy(call):
